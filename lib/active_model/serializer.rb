@@ -106,7 +106,7 @@ end
       @root         = options.fetch(:root, self.class._root)
       @meta_key     = options[:meta_key] || :meta
       @meta         = options[@meta_key]
-      @convert_type = options[:convert_type]
+      @convert_type = options.fetch(:convert_type, CONFIG.convert_type)
     end
     attr_accessor :object, :scope, :meta_key, :meta, :root, :convert_type
 
