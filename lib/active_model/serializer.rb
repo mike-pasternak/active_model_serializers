@@ -13,8 +13,9 @@ module ActiveModel
 
     class << self
       def inherited(base)
-        base._attributes = []
-        base._associations = {}
+        base._root = _root
+        base._attributes = (_attributes || []).dup
+        base._associations = (_associations || {}).dup
       end
 
       def setup
@@ -101,14 +102,18 @@ end
     end
 
     def initialize(object, options={})
-      @object       = object
-      @scope        = options[:scope]
-      @root         = options.fetch(:root, self.class._root)
-      @meta_key     = options[:meta_key] || :meta
-      @meta         = options[@meta_key]
+      @object        = object
+      @scope         = options[:scope]
+      @root          = options.fetch(:root, self.class._root)
+      @meta_key      = options[:meta_key] || :meta
+      @meta          = options[@meta_key]
+      @wrap_in_array = options[:_wrap_in_array]
+      @only          = Array(options[:only]) if options[:only]
+      @except        = Array(options[:except]) if options[:except]
       @convert_type = options.fetch(:convert_type, CONFIG.convert_type)
     end
-    attr_accessor :object, :scope, :meta_key, :meta, :root, :convert_type
+
+    attr_accessor :object, :scope, :root, :meta_key, :meta, :convert_type
 
     def json_key
       if root == true || root.nil?
@@ -139,11 +144,13 @@ end
     end
 
     def filter(keys)
-      keys
-    end
-
-    def serializable_data
-      embedded_in_root_associations.merge!(super)
+      if @only
+        keys & @only
+      elsif @except
+        keys - @except
+      else
+        keys
+      end
     end
 
     def embedded_in_root_associations
@@ -152,21 +159,28 @@ end
       associations.each_with_object({}) do |(name, association), hash|
         if included_associations.include? name
           if association.embed_in_root?
-            hash[association.embedded_key] = serialize association
+            association_serializer = build_serializer(association)
+            hash.merge! association_serializer.embedded_in_root_associations
+
+            serialized_data = association_serializer.serializable_object
+            key = association.root_key
+            if hash.has_key?(key)
+              hash[key].concat(serialized_data).uniq!
+            else
+              hash[key] = serialized_data
+            end
           end
         end
       end
     end
 
+    def build_serializer(association)
+      object = send(association.name)
+      association.build_serializer(object, {scope: scope, convert_type: convert_type})
+    end
+
     def serialize(association)
-      associated_data = send(association.name)
-      if associated_data.respond_to?(:to_ary) &&
-         !(association.serializer_class &&
-           association.serializer_class <= ArraySerializer)
-        associated_data.map { |elem| association.build_serializer(elem, @convert_type).serializable_hash }
-      else
-        association.build_serializer(associated_data).serializable_object
-      end
+      build_serializer(association).serializable_object
     end
 
     def serialize_ids(association)
@@ -178,31 +192,12 @@ end
       end
     end
 
-    def serializable_hash(options={})
-      return nil if object.nil?
+    def serializable_object(options={})
+      return @wrap_in_array ? [] : nil if @object.nil?
       hash = attributes
-      convert_keys hash.merge!(associations)
+      hash = convert_keys hash.merge!(associations)
+      @wrap_in_array ? [hash] : hash
     end
-    alias_method :serializable_object, :serializable_hash
-
-    def convert_keys(hash)
-      hash.inject({}) { |h, (k, v)| h[apply_conversion(k)] = v; h }
-    end
-
-    def apply_conversion(key)
-      if key
-        return key.to_s.camelize(:lower) if convert_type == 'camelcase'
-        return key.to_s.upcase           if convert_type == 'upcase'
-      end
-      key
-    end
-
-    def camelize_keys!
-      @convert_type = "camelcase"
-    end
-
-    def upcase_keys!
-      @convert_type = "upcase"
-    end
+    alias_method :serializable_hash, :serializable_object
   end
 end

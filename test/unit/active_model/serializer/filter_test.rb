@@ -2,7 +2,27 @@ require 'test_helper'
 
 module ActiveModel
   class Serializer
-    class FilterAttributesTest < ActiveModel::TestCase
+    class FilterOptionsTest < Minitest::Test
+      def setup
+        @profile = Profile.new({ name: 'Name 1', description: 'Description 1', comments: 'Comments 1' })
+      end
+
+      def test_only_option
+        @profile_serializer = ProfileSerializer.new(@profile, only: :name)
+        assert_equal({
+          'profile' => { name: 'Name 1' }
+        }, @profile_serializer.as_json)
+      end
+
+      def test_except_option
+        @profile_serializer = ProfileSerializer.new(@profile, except: :comments)
+        assert_equal({
+          'profile' => { name: 'Name 1', description: 'Description 1' }
+        }, @profile_serializer.as_json)
+      end
+    end
+
+    class FilterAttributesTest < Minitest::Test
       def setup
         @profile = Profile.new({ name: 'Name 1', description: 'Description 1', comments: 'Comments 1' })
         @profile_serializer = ProfileSerializer.new(@profile)
@@ -20,7 +40,7 @@ module ActiveModel
       end
     end
 
-    class FilterAssociationsTest < ActiveModel::TestCase
+    class FilterAssociationsTest < Minitest::Test
       def setup
         @association = PostSerializer._associations[:comments]
         @old_association = @association.dup

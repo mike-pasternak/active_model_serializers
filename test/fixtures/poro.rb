@@ -25,6 +25,9 @@ end
 class Profile < Model
 end
 
+class Event < Model
+end
+
 class Post < Model
   def comments
     @comments ||= [Comment.new(content: 'C1'),
@@ -57,6 +60,10 @@ class PostSerializer < ActiveModel::Serializer
   attributes :title, :body, :created_at, :updated_at
 
   has_many :comments
+end
+
+class EventSerializer < ActiveModel::Serializer
+  attributes :created_at, :updated_at
 end
 
 class CommentSerializer < ActiveModel::Serializer

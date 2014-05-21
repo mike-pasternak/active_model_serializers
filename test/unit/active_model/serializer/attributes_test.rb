@@ -2,7 +2,7 @@ require 'test_helper'
 
 module ActiveModel
   class Serializer
-    class AttributesTest < ActiveModel::TestCase
+    class AttributesTest < Minitest::Test
       def setup
         @profile = Profile.new({ name: 'Name 1', description: 'Description 1', comments: 'Comments 1' })
         @profile_serializer = ProfileSerializer.new(@profile)
@@ -24,26 +24,38 @@ module ActiveModel
           'profile' => { name: 'Name 1', description: 'Description 1' }
         }, @profile_serializer.as_json)
       end
+
+      def test_attributes_inheritance
+        inherited_serializer_klass = Class.new(ProfileSerializer) do
+          attributes :comments
+        end
+        another_inherited_serializer_klass = Class.new(ProfileSerializer)
+
+        assert_equal([:name, :description, :comments],
+                     inherited_serializer_klass._attributes)
+        assert_equal([:name, :description],
+                     another_inherited_serializer_klass._attributes)
+      end
     end
 
     class HashKeyTest < ActiveModel::TestCase
       def setup
-        @post = Post.new({ title: 'test', body: 'lorem ipsum', created_at: Time.now, updated_at: Time.now })
-        @post_serializer = PostSerializer.new(@post)
+        @event = Event.new({created_at: Time.now, updated_at: Time.now })
+        @event_serializer = EventSerializer.new(@event)
       end
 
       def test_attributes_serialization_using_camelcase_key_conversion
-        @post_serializer.convert_type = 'camelcase'
+        @event_serializer.convert_type = 'camelcase'
         assert_match({
-          'title' => 'test', 'body' => 'lorem ipsum', 'createdAt' => Time.now, 'updatedAt' => Time.now, 'comments' => [{ 'content' => 'C1'}, { 'content' => 'C2'}]
-        }.to_s, @post_serializer.serializable_hash.to_s)
+          'createdAt' => Time.now, 'updatedAt' => Time.now
+        }.to_s, @event_serializer.serializable_hash.to_s)
       end
 
       def test_attributes_serialization_using_upcase_key_conversion
-        @post_serializer.convert_type = 'upcase'
+        @event_serializer.convert_type = 'upcase'
         assert_match({
-          'TITLE' => 'test', 'BODY' => 'lorem ipsum', 'CREATED_AT' => Time.now, 'UPDATED_AT' => Time.now, 'COMMENTS' => [{'CONTENT' => 'C1'}, { 'CONTENT' => 'C2'}]
-        }.to_s, @post_serializer.serializable_hash.to_s)
+          'CREATED_AT' => Time.now, 'UPDATED_AT' => Time.now
+        }.to_s, @event_serializer.serializable_hash.to_s)
       end
     end
 
