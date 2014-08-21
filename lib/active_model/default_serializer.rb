@@ -18,6 +18,7 @@ module ActiveModel
     def as_json(options={})
       return [] if @object.nil? && @wrap_in_array
       hash = @object.as_json
+      hash = convert_keys(hash) if @convert_type
       @wrap_in_array ? [hash] : hash
     end
     alias serializable_hash as_json
